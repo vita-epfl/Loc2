@@ -4,7 +4,10 @@ os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 import argparse
 import ast
 import configparser
+import json
 import random
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -30,6 +33,7 @@ CITY_METERS_PER_PIXEL = {
 NUM_WORKERS = 4
 PROJECT_ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = PROJECT_ROOT / "config.ini"
+RESULTS_ROOT = PROJECT_ROOT / "results"
 
 
 def parse_args():
@@ -43,6 +47,7 @@ def parse_args():
         help="random orientation range from -x degrees to x degrees",
     )
     parser.add_argument("--model_path", type=str, default=None)
+    parser.add_argument("--results_dir", type=str, default=None)
     parser.add_argument("--max_depth", type=float, default=35.0)
 
     parser.add_argument("--ransac", choices=("True", "False"), default="False")
@@ -90,10 +95,28 @@ def build_eval_dataset(dataset_root, area, random_orientation):
         random_orientation=random_orientation,
     )
 
+
 def resolve_model_path(args):
     if args.model_path is None:
         raise ValueError("Specify --model_path.")
     return Path(args.model_path)
+
+
+def resolve_results_root(args):
+    return Path(args.results_dir) if args.results_dir is not None else RESULTS_ROOT
+
+
+def sanitize_filename_part(value):
+    sanitized = re.sub(r"[^A-Za-z0-9._-]+", "_", str(value))
+    return sanitized.strip("._") or "run"
+
+
+def build_results_path(model_path, area, results_root):
+    results_root.mkdir(parents=True, exist_ok=True)
+    model_tag_parts = model_path.parts[-3:] if len(model_path.parts) >= 3 else (model_path.name,)
+    model_tag = sanitize_filename_part("_".join(model_tag_parts))
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return results_root / f"eval_vigor_{sanitize_filename_part(area)}_{model_tag}_{timestamp}.json"
 
 
 def create_metric_grid(grid_size, resolution, batch_size, device):
@@ -131,6 +154,30 @@ def build_pose_solver(args, metric_coord_sat, bev_coord_grd):
         metric_coord_sat,
         bev_coord_grd,
     )
+
+
+def summarize_metrics(translation_errors, yaw_errors):
+    if not translation_errors:
+        raise RuntimeError("Evaluation produced no valid samples.")
+
+    metrics = {
+        "num_samples": len(translation_errors),
+        "translation_mean_m": float(np.mean(translation_errors)),
+        "translation_median_m": float(np.median(translation_errors)),
+        "yaw_mean_deg": float(np.mean(yaw_errors)),
+        "yaw_median_deg": float(np.median(yaw_errors)),
+    }
+    print(f"Mean Translation Error: {metrics['translation_mean_m']:.3f}")
+    print(f"Median Translation Error: {metrics['translation_median_m']:.3f}")
+    print(f"Mean Yaw Error: {metrics['yaw_mean_deg']:.3f}")
+    print(f"Median Yaw Error: {metrics['yaw_median_deg']:.3f}")
+    return metrics
+
+
+def save_results(results_path, payload):
+    with open(results_path, "w", encoding="utf-8") as handle:
+        json.dump(payload, handle, indent=2)
+        handle.write("\n")
 
 
 def main():
@@ -233,16 +280,25 @@ def main():
                 yaw = np.degrees(np.arctan2(R_np[b, 1, 0], R_np[b, 0, 0]))
                 yaw_gt = np.degrees(np.arctan2(Rgt_np[b, 1, 0], Rgt_np[b, 0, 0]))
                 diff = abs(yaw - yaw_gt)
-                yaw_errors.append(min(diff, 360 - diff))
+                yaw_errors.append(float(min(diff, 360 - diff)))
 
                 tgt_b = tgt[b] * resolution[b]
-                translation_errors.append(torch.norm(t[b] - tgt_b, dim=-1).cpu().numpy())
+                translation_errors.append(float(torch.norm(t[b] - tgt_b, dim=-1).item()))
 
+    metrics = summarize_metrics(translation_errors, yaw_errors)
+    results_path = build_results_path(model_path, args.area, resolve_results_root(args))
+    save_results(
+        results_path,
+        {
+            "script": Path(__file__).name,
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            "model_path": str(model_path),
+            "args": {k: v for k, v in vars(args).items() if k != "results_dir"},
+            "metrics": metrics,
+        },
+    )
+    print(f"Saved results to {results_path}")
 
-    print("Mean Translation Error:", np.mean(np.array(translation_errors).squeeze()))
-    print("Median Translation Error:", np.median(np.array(translation_errors).squeeze()))
-    print("Mean Yaw Error:", np.mean(np.array(yaw_errors).squeeze()))
-    print("Median Yaw Error:", np.median(np.array(yaw_errors).squeeze()))
 
 if __name__ == "__main__":
     main()
