@@ -9,18 +9,22 @@ We propose an accurate and interpretable fine-grained cross-view localization me
 ## 📦 Checkpoints
 📁 [**Download pretrained models**](https://drive.google.com/drive/folders/1JQHSxN-IRViKdFri2m9JtLMR_JdFLBIO)
 
-### VIGOR Dataset
+## 🗂️ Data Preparation
 
-Download the dataset from the [official VIGOR repository](https://github.com/Jeff-Zilence/VIGOR/blob/main/data/DATASET.md).
+### VIGOR
+Please download and prepare the VIGOR dataset by following the instructions in the [official repository](https://github.com/Jeff-Zilence/VIGOR/blob/main/data/DATASET.md).
 
-### KITTI Dataset
+### KITTI
+Please download and organize the KITTI dataset according to the directory structure used in [HighlyAccurate](https://github.com/YujiaoShi/HighlyAccurate).
 
-Download and structure the dataset according to [https://github.com/YujiaoShi/HighlyAccurate].
+## 📊 Evaluation
+
+## 🚀 Training
 
 ## ✅ To-Do
 
 - [x] Initial repo structure
-- [ ] Evaluation pipeline
+- [x] Evaluation pipeline
 - [ ] Pretrained checkpoints
 - [ ] Training scripts
 - [ ] Visualization tools
