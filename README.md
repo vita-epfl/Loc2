@@ -19,7 +19,52 @@ Please download and organize the KITTI dataset according to the directory struct
 
 ## 📊 Evaluation
 
+Run all commands from the repository root.
+
+### VIGOR
+
+```bash
+python eval_vigor.py --area <samearea|crossarea> --random_orientation <0|180> --ransac True --model_path <checkpoint>
+```
+
+Checkpoints:
+- `checkpoints/vigor/samearea/known_ori/model.pt`
+- `checkpoints/vigor/samearea/unknown_ori/model.pt`
+- `checkpoints/vigor/crossarea/known_ori/model.pt`
+- `checkpoints/vigor/crossarea/unknown_ori/model.pt`
+
+### KITTI
+
+```bash
+python eval_kitti.py --rotation_range <10|180> --max_depth 40 --model_path <checkpoint>
+```
+
+Checkpoints:
+- `checkpoints/kitti/ori_noise10/model.pt`
+- `checkpoints/kitti/ori_noise180/model.pt`
+
+### Output
+
+Evaluation results are saved to `results/` by default. Use `--results_dir /path/to/output_dir` to override it.
+
 ## 🚀 Training
+
+### VIGOR
+
+```bash
+python train_vigor.py --area <samearea|crossarea> --random_orientation <0|180>
+```
+
+Optional arguments:
+- `--batch_size` (default: `80`)
+- `--learning_rate` (default: `1e-4`)
+- `--max_depth` (default: `35`)
+- `--beta` (default: `1.0`)
+- `--loss_grid_size` (default: `5.0`)
+- `--temperature` (default: `0.1`)
+- `--epoch_to_resume` to resume training
+
+Training checkpoints are saved to `../checkpoints/` and metrics are saved to `../results/`.
 
 ## ✅ To-Do
 
