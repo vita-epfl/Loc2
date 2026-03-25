@@ -1,0 +1,17 @@
+--index-url https://download.pytorch.org/whl/cu118
+
+setuptools==69.5.1
+pathtools
+promise
+pybind11
+omegaconf
+
+torch==2.3.1
+torchvision==0.18.1
+torchaudio==2.3.1
+xformers==0.0.26
+
+jupyter
+notebook
+tensorboard
+einops
