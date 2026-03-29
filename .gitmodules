@@ -1,0 +1,3 @@
+[submodule "external/unik3d"]
+	path = external/unik3d
+	url = https://github.com/lpiccinelli-eth/UniK3D.git

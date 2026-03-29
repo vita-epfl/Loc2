@@ -9,10 +9,23 @@ We propose an accurate and interpretable fine-grained cross-view localization me
 ## 📦 Checkpoints
 📁 [**Download pretrained models**](https://drive.google.com/drive/folders/1JQHSxN-IRViKdFri2m9JtLMR_JdFLBIO)
 
+## 🛠️ Installation
+```bash
+conda create -n loc2 python=3.10
+conda activate loc2
+pip install -r requirements.txt
+```
+> *Note: The code is tested with PyTorch 2.3.1, CUDA 11.8, and xformers 0.0.26 on NVIDIA A100/H100 GPUs.*
+
 ## 🗂️ Data Preparation
 
 ### VIGOR
 Please download and prepare the VIGOR dataset by following the instructions in the [official repository](https://github.com/Jeff-Zilence/VIGOR/blob/main/data/DATASET.md).
+
+To generate metric depth maps for the VIGOR dataset (for both training and evaluation):
+```bash
+python preprocess/infer_depth_vigor.py --input <VIGOR_PATH>/<CITY_NAME>/panorama --output <VIGOR_PATH>/<CITY_NAME>/unik3d_depth --save
+```
 
 ### KITTI
 Please download and organize the KITTI dataset according to the directory structure used in [HighlyAccurate](https://github.com/YujiaoShi/HighlyAccurate).
