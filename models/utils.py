@@ -20,8 +20,12 @@ def weighted_procrustes_2d(A, B, w=None, use_weights=True, use_mask=False, eps=1
         A_c, B_c = A - A_mean, B - B_mean
         H = A_c.transpose(1, 2) @ B_c
 
-    if check_rank and (torch.linalg.matrix_rank(H) == 1).sum() > 0:
-        return None, None, False
+    if check_rank:
+        ok_rank = torch.linalg.matrix_rank(H) > 1
+        if not ok_rank.any():
+            return None, None, ok_rank
+    else:
+        ok_rank = torch.ones(A.shape[0], dtype=torch.bool, device=A.device)
 
     U, S, V = torch.svd(H)
     Z = torch.eye(2, device=A.device).unsqueeze(0).repeat(A.shape[0], 1, 1)
@@ -30,7 +34,13 @@ def weighted_procrustes_2d(A, B, w=None, use_weights=True, use_mask=False, eps=1
     R = V @ Z @ U.transpose(1, 2)
     t = B_mean - A_mean @ R.transpose(1, 2)
 
-    return R, t, True
+    if check_rank and not ok_rank.all():
+        R = R.clone()
+        t = t.clone()
+        R[~ok_rank] = torch.nan
+        t[~ok_rank] = torch.nan
+
+    return R, t, ok_rank
 
 def weighted_procrustes_2d_with_scale(A, B, w=None, use_weights=True, use_mask=False, eps=1e-16, check_rank=True):
     assert len(A) == len(B)
@@ -52,8 +62,12 @@ def weighted_procrustes_2d_with_scale(A, B, w=None, use_weights=True, use_mask=F
         B_c = B - B_mean
         H = A_c.transpose(1, 2) @ B_c
 
-    if check_rank and (torch.linalg.matrix_rank(H) == 1).sum() > 0:
-        return None, None, None, False
+    if check_rank:
+        ok_rank = torch.linalg.matrix_rank(H) > 1
+        if not ok_rank.any():
+            return None, None, None, ok_rank
+    else:
+        ok_rank = torch.ones(A.shape[0], dtype=torch.bool, device=A.device)
 
     U, S, V = torch.svd(H)
     Z = torch.eye(2, device=A.device).unsqueeze(0).repeat(A.shape[0], 1, 1)
@@ -73,7 +87,15 @@ def weighted_procrustes_2d_with_scale(A, B, w=None, use_weights=True, use_mask=F
 
     t = B_mean - s * (A_mean @ R.transpose(1, 2))
 
-    return R, t, s, True
+    if check_rank and not ok_rank.all():
+        R = R.clone()
+        t = t.clone()
+        s = s.clone()
+        R[~ok_rank] = torch.nan
+        t[~ok_rank] = torch.nan
+        s[~ok_rank] = torch.nan
+
+    return R, t, s, ok_rank
 
 def soft_inlier_counting_bev(X0, X1, R, t, th=50):
     beta = 5 / th
@@ -113,6 +135,7 @@ class e2eProbabilisticProcrustesSolver():
     def estimate_pose(self, matching_score, return_inliers=False):
         device = matching_score.device
         matches = matching_score.detach()
+        neg_inf = torch.tensor(float('-inf'), device=device)
 
         B, num_kpts_sat, num_kpts_grd = matches.shape
 
@@ -157,16 +180,19 @@ class e2eProbabilisticProcrustesSolver():
 
                 R, t, scale, ok_rank = weighted_procrustes_2d_with_scale(Y_k, X_k, use_weights=False)
 
-                if not ok_rank:
+                if t is None:
                     continue
 
-                invalid_t = (torch.isnan(t).any() or torch.isinf(t).any())
-                invalid_R = (torch.isnan(R).any() or torch.isinf(R).any())
+                valid_h = ok_rank.clone()
+                valid_h &= torch.isfinite(t).all(dim=(1, 2))
+                valid_h &= torch.isfinite(R).all(dim=(1, 2))
+                valid_h &= torch.isfinite(scale).all(dim=(1, 2))
 
-                if invalid_t or invalid_R:
+                if not valid_h.any():
                     continue
 
                 score_k = soft_inlier_counting_bev_with_scale(Y, X, R, t, scale, th=self.th_soft_inlier)
+                score_k = score_k.masked_fill(~valid_h.unsqueeze(-1), neg_inf)
 
                 Rs = torch.cat([Rs, R.unsqueeze(1)], 1)
                 ts = torch.cat([ts, t.unsqueeze(1)], 1)
@@ -176,40 +202,66 @@ class e2eProbabilisticProcrustesSolver():
                 num_valid_h += 1
 
         if num_valid_h > 0:
+            has_valid = torch.isfinite(scores_ransac).any(dim=1)
+            if not has_valid.any():
+                return None, None, None, None, None
+
+            row_idx = torch.arange(B, device=device)
             max_ind = torch.argmax(scores_ransac, dim=1)
-            R = Rs[batch_idx_ransac[:, 0], max_ind]
-            t_metric = ts[batch_idx_ransac[:, 0], max_ind]
-            scale = scales[batch_idx_ransac[:, 0], max_ind]
-            best_inliers = scores_ransac[batch_idx_ransac[:, 0], max_ind]
+            R = Rs[row_idx, max_ind].clone()
+            t_metric = ts[row_idx, max_ind].clone()
+            scale = scales[row_idx, max_ind].clone()
+            best_inliers = scores_ransac[row_idx, max_ind].clone()
 
             X_best = torch.zeros_like(X)
             Y_best = torch.zeros_like(Y)
             for i_b in range(len(max_ind)):
+                if not has_valid[i_b]:
+                    continue
                 X_best[i_b], Y_best[i_b] = dict_corr[it_matches_ids[max_ind[i_b]]]['X'][i_b], dict_corr[it_matches_ids[max_ind[i_b]]]['Y'][i_b]
             inliers_ref = torch.zeros((B, self.num_samples_matches)).to(device)
 
             th_ref = self.num_refinements*[self.th_inlier]
             inliers_pre = self.num_corr_2d_2d * torch.ones_like(best_inliers)
             for i_ref in range(len(th_ref)):
-                inliers = inlier_counting_bev_with_scale(Y_best, X_best, R, t_metric, scale, th=th_ref[i_ref])
+                if not has_valid.any():
+                    break
 
-                do_ref = (inliers.sum(-1) >= self.num_corr_2d_2d) * (inliers.sum(-1) > inliers_pre)
+                inliers = torch.zeros((B, self.num_samples_matches), device=device)
+                inliers_valid = inlier_counting_bev_with_scale(
+                    Y_best[has_valid],
+                    X_best[has_valid],
+                    R[has_valid],
+                    t_metric[has_valid],
+                    scale[has_valid],
+                    th=th_ref[i_ref],
+                )
+                inliers[has_valid] = inliers_valid
+
+                do_ref = has_valid & (inliers.sum(-1) >= self.num_corr_2d_2d) & (inliers.sum(-1) > inliers_pre)
                 inliers_pre[do_ref] = inliers.sum(-1)[do_ref]
 
                 if (do_ref.sum().float() == 0.).item():
                     break
                 inliers_ref[do_ref] = inliers[do_ref]
-                R[do_ref], t_metric[do_ref], _, _ = weighted_procrustes_2d_with_scale(Y_best[do_ref], X_best[do_ref],
-                                                                     use_weights=True, use_mask=True,
-                                                                     check_rank=False,
-                                                                     w=inliers_ref[do_ref])
-            best_inliers = soft_inlier_counting_bev_with_scale(Y_best, X_best, R, t_metric, scale, th=self.th_inlier)
+                R_ref, t_ref, scale_ref, _ = weighted_procrustes_2d_with_scale(
+                    Y_best[do_ref], X_best[do_ref],
+                    use_weights=True, use_mask=True,
+                    check_rank=False,
+                    w=inliers_ref[do_ref],
+                )
+                R[do_ref], t_metric[do_ref], scale[do_ref] = R_ref, t_ref, scale_ref
+            best_inliers = torch.full_like(best_inliers, torch.nan)
+            best_inliers[has_valid] = soft_inlier_counting_bev_with_scale(
+                Y_best[has_valid], X_best[has_valid], R[has_valid], t_metric[has_valid], scale[has_valid], th=self.th_inlier
+            ).squeeze(-1)
+
+            R[~has_valid] = torch.nan
+            t_metric[~has_valid] = torch.nan
+            scale[~has_valid] = torch.nan
 
         else:
-            R = torch.zeros((B, 2, 2)).to(matches.device)
-            t_metric = torch.zeros((B, 1, 2)).to(matches.device)
-            scale = torch.zeros((B, 1, 1)).to(matches.device)
-            best_inliers = torch.zeros((B)).to(matches.device)
+            return None, None, None, None, None
 
         inliers = None
         if return_inliers:
@@ -220,13 +272,20 @@ class e2eProbabilisticProcrustesSolver():
 
                 weights_best = torch.zeros_like(weights)
                 for i_b in range(len(max_ind)):
+                    if not has_valid[i_b]:
+                        continue
                     X_best[i_b], Y_best[i_b] = dict_corr[it_matches_ids[max_ind[i_b]]]['X'][i_b], dict_corr[it_matches_ids[max_ind[i_b]]]['Y'][i_b]
-
                     weights_best[i_b] = dict_corr[it_matches_ids[max_ind[i_b]]]['weights'][i_b]
 
-                inliers_idxs = inlier_counting_bev_with_scale(Y_best, X_best, R, t_metric, scale, th=self.th_inlier)
+                inliers_idxs = torch.zeros((B, self.num_samples_matches), device=device)
+                inliers_idxs[has_valid] = inlier_counting_bev_with_scale(
+                    Y_best[has_valid], X_best[has_valid], R[has_valid], t_metric[has_valid], scale[has_valid], th=self.th_inlier
+                )
                 inliers = []
                 for idx_b in range(len(inliers_idxs)):
+                    if not has_valid[idx_b]:
+                        inliers.append(torch.empty((0, 5), device=device))
+                        continue
                     X_inliers = X_best[idx_b, inliers_idxs[idx_b]==1.]
                     Y_inliers = Y_best[idx_b, inliers_idxs[idx_b]==1.]
                     score_inliers = weights_best[idx_b, inliers_idxs[idx_b]==1.]
@@ -252,6 +311,7 @@ class e2eProbabilisticProcrustesSolver_no_scale():
     def estimate_pose(self, matching_score, return_inliers=False):
         device = matching_score.device
         matches = matching_score.detach()
+        neg_inf = torch.tensor(float('-inf'), device=device)
 
         B, num_kpts_sat, num_kpts_grd = matches.shape
 
@@ -295,16 +355,18 @@ class e2eProbabilisticProcrustesSolver_no_scale():
 
                 R, t, ok_rank = weighted_procrustes_2d(Y_k, X_k, use_weights=False)
 
-                if not ok_rank:
+                if t is None:
                     continue
 
-                invalid_t = (torch.isnan(t).any() or torch.isinf(t).any())
-                invalid_R = (torch.isnan(R).any() or torch.isinf(R).any())
+                valid_h = ok_rank.clone()
+                valid_h &= torch.isfinite(t).all(dim=(1, 2))
+                valid_h &= torch.isfinite(R).all(dim=(1, 2))
 
-                if invalid_t or invalid_R:
+                if not valid_h.any():
                     continue
 
                 score_k = soft_inlier_counting_bev(X, Y, R, t, th=self.th_soft_inlier)
+                score_k = score_k.masked_fill(~valid_h.unsqueeze(-1), neg_inf)
 
                 Rs = torch.cat([Rs, R.unsqueeze(1)], 1)
                 ts = torch.cat([ts, t.unsqueeze(1)], 1)
@@ -313,38 +375,63 @@ class e2eProbabilisticProcrustesSolver_no_scale():
                 num_valid_h += 1
 
         if num_valid_h > 0:
+            has_valid = torch.isfinite(scores_ransac).any(dim=1)
+            if not has_valid.any():
+                return None, None, None, None
+
+            row_idx = torch.arange(B, device=device)
             max_ind = torch.argmax(scores_ransac, dim=1)
-            R = Rs[batch_idx_ransac[:, 0], max_ind]
-            t_metric = ts[batch_idx_ransac[:, 0], max_ind]
-            best_inliers = scores_ransac[batch_idx_ransac[:, 0], max_ind]
+            R = Rs[row_idx, max_ind].clone()
+            t_metric = ts[row_idx, max_ind].clone()
+            best_inliers = scores_ransac[row_idx, max_ind].clone()
 
             X_best = torch.zeros_like(X)
             Y_best = torch.zeros_like(Y)
             for i_b in range(len(max_ind)):
+                if not has_valid[i_b]:
+                    continue
                 X_best[i_b], Y_best[i_b] = dict_corr[it_matches_ids[max_ind[i_b]]]['X'][i_b], dict_corr[it_matches_ids[max_ind[i_b]]]['Y'][i_b]
             inliers_ref = torch.zeros((B, self.num_samples_matches)).to(device)
 
             th_ref = self.num_refinements*[self.th_inlier]
             inliers_pre = self.num_corr_2d_2d * torch.ones_like(best_inliers)
             for i_ref in range(len(th_ref)):
-                inliers = inlier_counting_bev(X_best, Y_best, R, t_metric, th=th_ref[i_ref])
+                if not has_valid.any():
+                    break
 
-                do_ref = (inliers.sum(-1) >= self.num_corr_2d_2d) * (inliers.sum(-1) > inliers_pre)
+                inliers = torch.zeros((B, self.num_samples_matches), device=device)
+                inliers_valid = inlier_counting_bev(
+                    X_best[has_valid],
+                    Y_best[has_valid],
+                    R[has_valid],
+                    t_metric[has_valid],
+                    th=th_ref[i_ref],
+                )
+                inliers[has_valid] = inliers_valid
+
+                do_ref = has_valid & (inliers.sum(-1) >= self.num_corr_2d_2d) & (inliers.sum(-1) > inliers_pre)
                 inliers_pre[do_ref] = inliers.sum(-1)[do_ref]
 
                 if (do_ref.sum().float() == 0.).item():
                     break
                 inliers_ref[do_ref] = inliers[do_ref]
-                R[do_ref], t_metric[do_ref], _ = weighted_procrustes_2d(Y_best[do_ref], X_best[do_ref],
-                                                                     use_weights=True, use_mask=True,
-                                                                     check_rank=False,
-                                                                     w=inliers_ref[do_ref])
-            best_inliers = soft_inlier_counting_bev(X_best, Y_best, R, t_metric, th=self.th_inlier)
+                R_ref, t_ref, _ = weighted_procrustes_2d(
+                    Y_best[do_ref], X_best[do_ref],
+                    use_weights=True, use_mask=True,
+                    check_rank=False,
+                    w=inliers_ref[do_ref],
+                )
+                R[do_ref], t_metric[do_ref] = R_ref, t_ref
+            best_inliers = torch.full_like(best_inliers, torch.nan)
+            best_inliers[has_valid] = soft_inlier_counting_bev(
+                X_best[has_valid], Y_best[has_valid], R[has_valid], t_metric[has_valid], th=self.th_inlier
+            ).squeeze(-1)
+
+            R[~has_valid] = torch.nan
+            t_metric[~has_valid] = torch.nan
 
         else:
-            R = torch.zeros((B, 2, 2)).to(matches.device)
-            t_metric = torch.zeros((B, 1, 2)).to(matches.device)
-            best_inliers = torch.zeros((B)).to(matches.device)
+            return None, None, None, None
 
         inliers = None
         if return_inliers:
@@ -354,12 +441,20 @@ class e2eProbabilisticProcrustesSolver_no_scale():
                 Y_best = torch.zeros_like(Y)
                 weights_best = torch.zeros_like(weights)
                 for i_b in range(len(max_ind)):
+                    if not has_valid[i_b]:
+                        continue
                     X_best[i_b], Y_best[i_b] = dict_corr[it_matches_ids[max_ind[i_b]]]['X'][i_b], dict_corr[it_matches_ids[max_ind[i_b]]]['Y'][i_b]
                     weights_best[i_b] = dict_corr[it_matches_ids[max_ind[i_b]]]['weights'][i_b]
 
-                inliers_idxs = inlier_counting_bev(X_best, Y_best, R, t_metric, th=self.th_inlier)
+                inliers_idxs = torch.zeros((B, self.num_samples_matches), device=device)
+                inliers_idxs[has_valid] = inlier_counting_bev(
+                    X_best[has_valid], Y_best[has_valid], R[has_valid], t_metric[has_valid], th=self.th_inlier
+                )
                 inliers = []
                 for idx_b in range(len(inliers_idxs)):
+                    if not has_valid[idx_b]:
+                        inliers.append(torch.empty((0, 5), device=device))
+                        continue
                     X_inliers = X_best[idx_b, inliers_idxs[idx_b]==1.]
                     Y_inliers = Y_best[idx_b, inliers_idxs[idx_b]==1.]
                     score_inliers = weights_best[idx_b, inliers_idxs[idx_b]==1.]

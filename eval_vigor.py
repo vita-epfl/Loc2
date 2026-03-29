@@ -39,7 +39,7 @@ RESULTS_ROOT = PROJECT_ROOT / "results"
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--area", type=str, default="samearea", help="samearea or crossarea")
-    parser.add_argument("-b", "--batch_size", type=int, default=128, help="batch size")
+    parser.add_argument("-b", "--batch_size", type=int, default=80, help="batch size")
     parser.add_argument(
         "--random_orientation",
         type=float,
@@ -274,9 +274,23 @@ def main():
                 print("Skipping batch: singular transformation matrix")
                 continue
 
+            valid_pose = torch.isfinite(t).all(dim=(1, 2)) & torch.isfinite(R).all(dim=(1, 2))
+            if scale is not None:
+                valid_pose &= torch.isfinite(scale).all(dim=(1, 2))
+
+            if not valid_pose.any():
+                print("Skipping batch: singular transformation matrix")
+                continue
+
+            num_invalid = int((~valid_pose).sum().item())
+            if num_invalid:
+                print(f"Skipping {num_invalid} samples: invalid transformation estimate")
+
             Rgt_np = Rgt.cpu().numpy()
             R_np = R.cpu().numpy()
             for b in range(batch_size):
+                if not valid_pose[b]:
+                    continue
                 yaw = np.degrees(np.arctan2(R_np[b, 1, 0], R_np[b, 0, 0]))
                 yaw_gt = np.degrees(np.arctan2(Rgt_np[b, 1, 0], Rgt_np[b, 0, 0]))
                 diff = abs(yaw - yaw_gt)
