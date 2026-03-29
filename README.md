@@ -17,7 +17,7 @@ pip install -r requirements.txt
 ```
 > *Note: The code is tested with PyTorch 2.3.1, CUDA 11.8, and xformers 0.0.26 on NVIDIA A100/H100 GPUs.*
 
-## 🗂️ Data Preparation
+## 🗂️ Datasets and Depth Maps Preparation
 
 ### VIGOR
 Please download and prepare the VIGOR dataset by following the instructions in the [official repository](https://github.com/Jeff-Zilence/VIGOR/blob/main/data/DATASET.md).
