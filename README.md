@@ -83,7 +83,7 @@ Training checkpoints are saved to `../checkpoints/` and metrics are saved to `..
 
 - [x] Initial repo structure
 - [x] Evaluation pipeline
-- [ ] Pretrained checkpoints
+- [x] Pretrained checkpoints
 - [ ] Training scripts
 - [ ] Visualization tools
 
