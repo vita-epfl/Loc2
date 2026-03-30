@@ -11,9 +11,8 @@ We propose an accurate and interpretable fine-grained cross-view localization me
 
 ## 🛠️ Installation
 ```bash
-conda create -n loc2 python=3.10
-conda activate loc2
-pip install -r requirements.txt
+git clone --recursive git@github.com:vita-epfl/Loc2.git
+cd Loc2 & bash install.sh
 ```
 > *Note: The code is tested with PyTorch 2.3.1, CUDA 11.8, and xformers 0.0.26 on NVIDIA A100/H100 GPUs.*
 
@@ -24,6 +23,7 @@ Please download and prepare the VIGOR dataset by following the instructions in t
 
 To generate metric depth maps for the VIGOR dataset (for both training and evaluation):
 ```bash
+pip install -e external/unik3d/ # Install UniK3D dependency
 python preprocess/infer_depth_vigor.py --input <VIGOR_PATH>/<CITY_NAME>/panorama --output <VIGOR_PATH>/<CITY_NAME>/unik3d_depth --save
 ```
 

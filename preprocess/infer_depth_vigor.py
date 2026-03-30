@@ -33,9 +33,9 @@ def save(rgb, outputs, name, base_path, save_map=False, save_pointcloud=False):
     depth_vigor = np.linalg.norm(depth_vigor, axis=0)
 
     if save_map:
-        # depth_map = np.where(depth_vigor < 500.0, depth_vigor * 1000.0, 500.0).astype(np.uint16)
-        # Image.fromarray(depth_map).save(os.path.join(base_path, f"{name}.png"))
-        np.save(os.path.join(base_path, f"{name}.npy"), depth_vigor)
+        depth_map = (np.clip(depth_vigor, 0.0, 100.0) * 500.0).astype(np.uint16)
+        Image.fromarray(depth_map).save(os.path.join(base_path, f"{name}.png"))
+        # np.save(os.path.join(base_path, f"{name}.npy"), depth_vigor)
 
     if save_pointcloud:
         predictions_3d = points_torch.permute(0, 2, 3, 1).reshape(-1, 3).detach().cpu().numpy()

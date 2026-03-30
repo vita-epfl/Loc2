@@ -130,7 +130,7 @@ class VIGORDataset(Dataset):
                 raise ValueError('Ground image is None')
             grd = self.grdimage_transform(grd)
 
-            depth_path = os.path.splitext(self.grd_list[idx].replace('panorama', 'unik3d_depth'))[0] + '.npy'
+            depth_path = os.path.splitext(self.grd_list[idx].replace('panorama', 'unik3d_depth'))[0] + '.png'
             depth = self._load_metric_depth(depth_path)
             if depth is None:
                 raise ValueError('Depth image is None')
@@ -172,7 +172,11 @@ class VIGORDataset(Dataset):
 
     def _load_metric_depth(self, path, max_depth=MAX_DEPTH_METERS):
         try:
-            depth = np.load(path)
+            if path.endswith('.npy'):
+                depth = np.load(path)
+            else:
+                with Image.open(path) as depth_image:
+                    depth = np.array(depth_image).astype(np.float32) / 500.0
             depth = np.clip(depth, 0, max_depth)
             if np.all(depth == max_depth):
                 print('all depth are larger than defined max depth')
