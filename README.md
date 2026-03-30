@@ -16,7 +16,7 @@ cd Loc2 & bash install.sh
 ```
 > *Note: The code is tested with PyTorch 2.3.1, CUDA 11.8, and xformers 0.0.26 on NVIDIA A100/H100 GPUs.*
 
-## 🗂️ Data Preparation
+## 🗂️ Datasets and Depth Maps Preparation
 
 ### VIGOR
 Please download and prepare the VIGOR dataset by following the instructions in the [official repository](https://github.com/Jeff-Zilence/VIGOR/blob/main/data/DATASET.md).
@@ -83,7 +83,7 @@ Training checkpoints are saved to `../checkpoints/` and metrics are saved to `..
 
 - [x] Initial repo structure
 - [x] Evaluation pipeline
-- [ ] Pretrained checkpoints
+- [x] Pretrained checkpoints
 - [ ] Training scripts
 - [ ] Visualization tools
 
