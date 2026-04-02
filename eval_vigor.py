@@ -14,6 +14,7 @@ import numpy as np
 import torch
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, default_collate
+from tqdm.auto import tqdm
 
 from dataloaders.dataloader_vigor_with_depth import VIGORDataset, transform_grd, transform_sat
 from models.modules import DinoExtractor
@@ -167,10 +168,10 @@ def summarize_metrics(translation_errors, yaw_errors):
         "yaw_mean_deg": float(np.mean(yaw_errors)),
         "yaw_median_deg": float(np.median(yaw_errors)),
     }
-    print(f"Mean Translation Error: {metrics['translation_mean_m']:.3f}")
-    print(f"Median Translation Error: {metrics['translation_median_m']:.3f}")
-    print(f"Mean Yaw Error: {metrics['yaw_mean_deg']:.3f}")
-    print(f"Median Yaw Error: {metrics['yaw_median_deg']:.3f}")
+    print(f"Mean Translation Error: {metrics['translation_mean_m']:.3f} m")
+    print(f"Median Translation Error: {metrics['translation_median_m']:.3f} m")
+    print(f"Mean Yaw Error: {metrics['yaw_mean_deg']:.3f} deg")
+    print(f"Median Yaw Error: {metrics['yaw_median_deg']:.3f} deg")
     return metrics
 
 
@@ -223,9 +224,18 @@ def main():
     translation_errors = []
     yaw_errors = []
 
+    progress_bar = tqdm(
+        test_dataloader,
+        total=len(test_dataloader),
+        desc=f"Evaluating {args.area}",
+        unit="batch",
+        dynamic_ncols=True,
+    )
+
     with torch.no_grad():
-        for data in test_dataloader:
+        for data in progress_bar:
             if data is None:
+                progress_bar.set_postfix(skipped="empty_batch")
                 continue
 
             grd, depth, sat, tgt, Rgt, cities, resolution = data
@@ -271,7 +281,7 @@ def main():
                 R, t, scale, _ = weighted_procrustes_2d_with_scale(Y, X, use_weights=True, use_mask=True, w=weights)
 
             if t is None:
-                print("Skipping batch: singular transformation matrix")
+                progress_bar.write("Skipping batch: singular transformation matrix")
                 continue
 
             valid_pose = torch.isfinite(t).all(dim=(1, 2)) & torch.isfinite(R).all(dim=(1, 2))
@@ -279,12 +289,12 @@ def main():
                 valid_pose &= torch.isfinite(scale).all(dim=(1, 2))
 
             if not valid_pose.any():
-                print("Skipping batch: singular transformation matrix")
+                progress_bar.write("Skipping batch: singular transformation matrix")
                 continue
 
             num_invalid = int((~valid_pose).sum().item())
             if num_invalid:
-                print(f"Skipping {num_invalid} samples: invalid transformation estimate")
+                progress_bar.write(f"Skipping {num_invalid} samples: invalid transformation estimate")
 
             Rgt_np = Rgt.cpu().numpy()
             R_np = R.cpu().numpy()

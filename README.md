@@ -1,7 +1,7 @@
 # [ICLR'26] Loc<sup>2</sup>: Interpretable Cross-View Localization via Depth-Lifted Local Feature Matching
 [[`Arxiv`](https://arxiv.org/pdf/2509.09792)][[`BibTeX`](#citation)]
 
-![](overview.png)
+![](docs/overview.png)
 
 ## 📝 Abstract
 We propose an accurate and interpretable fine-grained cross-view localization method that estimates the 3 Degrees of Freedom (DoF) pose of a ground-level image by matching its local features with a reference aerial image. Unlike prior approaches that rely on global descriptors or bird's-eye-view (BEV) transformations, our method directly learns ground-aerial image-plane correspondences using weak supervision from camera poses. The matched ground points are lifted into BEV space with monocular depth predictions, and scale-aware Procrustes alignment is then applied to estimate camera rotation, translation, and optionally the scale between relative depth and the aerial metric space. This formulation is lightweight, end-to-end trainable, and requires no pixel-level annotations. Experiments show state-of-the-art accuracy in challenging scenarios such as cross-area testing and unknown orientation. Furthermore, our method offers strong interpretability: correspondence quality directly reflects localization accuracy and enables outlier rejection via RANSAC, while overlaying the re-scaled ground layout on the aerial image provides an intuitive visual cue of localization performance.
@@ -14,7 +14,7 @@ We propose an accurate and interpretable fine-grained cross-view localization me
 git clone --recursive git@github.com:vita-epfl/Loc2.git
 cd Loc2 & bash install.sh
 ```
-> *Note: The code is tested with PyTorch 2.3.1, CUDA 11.8, and xformers 0.0.26 on NVIDIA A100/H100 GPUs.*
+> *Note: The codebase is tested with PyTorch 2.3.1, CUDA 11.8, and xFormers 0.0.27 on NVIDIA A100/H100 GPUs. The experiments reported in the paper were conducted using PyTorch 2.2.2, CUDA 12.1, and xFormers 0.0.25.*
 
 ## 🗂️ Datasets and Depth Maps Preparation
 

@@ -33,7 +33,8 @@ def save(rgb, outputs, name, base_path, save_map=False, save_pointcloud=False):
     depth_vigor = np.linalg.norm(depth_vigor, axis=0)
 
     if save_map:
-        depth_map = (np.clip(depth_vigor, 0.0, 100.0) * 500.0).astype(np.uint16)
+        max_depth = 65.0
+        depth_map = (np.clip(depth_vigor, 0.0, max_depth) * 1000.0).astype(np.uint16)
         Image.fromarray(depth_map).save(os.path.join(base_path, f"{name}.png"))
         # np.save(os.path.join(base_path, f"{name}.npy"), depth_vigor)
 
@@ -135,7 +136,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--camera-path",
         type=str,
-        default="./external/unik3d/assets/demo/equirectangular.json",
+        default="./doc/equirectangular.json",
         help="Path to camera parameters json file.",
     )
     parser.add_argument("--save", action="store_true", help="Save outputs as .npy.")

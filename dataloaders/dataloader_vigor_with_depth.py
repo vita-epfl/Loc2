@@ -176,7 +176,7 @@ class VIGORDataset(Dataset):
                 depth = np.load(path)
             else:
                 with Image.open(path) as depth_image:
-                    depth = np.array(depth_image).astype(np.float32) / 500.0
+                    depth = np.array(depth_image).astype(np.float32) / 1000.0
             depth = np.clip(depth, 0, max_depth)
             if np.all(depth == max_depth):
                 print('all depth are larger than defined max depth')
