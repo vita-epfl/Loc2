@@ -40,14 +40,13 @@ RESULTS_ROOT = PROJECT_ROOT.parent / "results"
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("-l", "--learning_rate", type=float, default=1e-4)
-    parser.add_argument("-b", "--batch_size", type=int, default=224)
+    parser.add_argument("-b", "--batch_size", type=int, default=128)
     parser.add_argument("--rotation_range", type=float, default=10.0)
     parser.add_argument("--beta", type=float, default=0.1)
     parser.add_argument("--epoch_to_resume", type=int, default=0)
     parser.add_argument("--loss_grid_size", type=float, default=5.0)
     parser.add_argument("--max_depth", type=float, default=40.0)
     parser.add_argument("--temperature", type=float, default=0.1)
-    parser.add_argument("--negative_distance_threshold", type=float, default=1.0)
     return parser.parse_args()
 
 
@@ -113,7 +112,6 @@ def build_experiment_label(args, settings):
         f"_lr_{args.learning_rate}"
         f"_scale_True"
         f"_temp_{args.temperature}"
-        f"_neg_{args.negative_distance_threshold}"
     )
 
 
@@ -390,7 +388,6 @@ def train_epoch(model, feature_extractor, dataloader, optimizer, device, args, s
                 bev_coord_grd,
                 mask,
                 settings["grid_size_h"],
-                negative_distance_threshold=args.negative_distance_threshold,
             )
         )
         loss = distance_loss + args.beta * infonce_loss
