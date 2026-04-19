@@ -36,7 +36,7 @@ RESULTS_ROOT = PROJECT_ROOT / "results"
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-b', '--batch_size', type=int, default=384)
+    parser.add_argument('-b', '--batch_size', type=int, default=224)
     parser.add_argument('--rotation_range', type=float, default=10.0)
     parser.add_argument('--model_path', type=str, default=None)
     parser.add_argument('--results_dir', type=str, default=None)

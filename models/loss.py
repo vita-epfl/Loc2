@@ -178,7 +178,8 @@ def compute_infonce_loss_match_all_with_scale_select_negatives(
     sampled_row, sampled_col,
     matching_score_original,
     sat_coord, grd_coord,
-    mask, grid_size_h
+    mask, grid_size_h,
+    negative_distance_threshold=1.0,
 ):
 
     B, num_sat, num_grd = matching_score_original.shape
@@ -201,7 +202,7 @@ def compute_infonce_loss_match_all_with_scale_select_negatives(
 
         keep_index_b = keep_index_b_distance.squeeze(0) * keep_index_b_depth
 
-        negative_mask = grd_pointwise_distance[b] > (1 / scale[b])
+        negative_mask = grd_pointwise_distance[b] > (negative_distance_threshold / scale[b])
 
         if keep_index_b.sum() > 0:
             valid_indices = keep_index_b.nonzero(as_tuple=True)[0]

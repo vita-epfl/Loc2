@@ -79,6 +79,24 @@ Optional arguments:
 
 Training checkpoints are saved to `../checkpoints/` and metrics are saved to `../results/`.
 
+### KITTI
+
+```bash
+python train_kitti.py --rotation_range <10|180>
+```
+
+Optional arguments:
+- `--batch_size` (default: `224`)
+- `--learning_rate` (default: `1e-4`)
+- `--max_depth` (default: `40`)
+- `--beta` (default: `0.1`)
+- `--loss_grid_size` (default: `5.0`)
+- `--temperature` (default: `0.1`)
+- `--negative_distance_threshold` (default: `1.0`)
+- `--epoch_to_resume` to resume training
+
+The current KITTI trainer always uses the scale-aware pose fit, keeps the InfoNCE loss on fixed metric scale (`torch.ones_like(scale)`), and saves checkpoints to `../checkpoints/` with per-epoch metrics in `../results/`.
+
 ## ✅ To-Do
 
 - [x] Initial repo structure
