@@ -94,12 +94,14 @@ Optional arguments:
 - `--temperature` (default: `0.1`)
 - `--epoch_to_resume` to resume training
 
+Training checkpoints are saved to `../checkpoints/` and metrics are saved to `../results/`.
+
 ## ✅ To-Do
 
 - [x] Initial repo structure
 - [x] Evaluation pipeline
 - [x] Pretrained checkpoints
-- [ ] Training scripts
+- [x] Training scripts
 - [ ] Visualization tools
 
 ## Citation
