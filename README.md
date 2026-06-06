@@ -60,7 +60,7 @@ Checkpoints:
 
 Evaluation results are saved to `results/` by default. Use `--results_dir /path/to/output_dir` to override it.
 
-## Visualization
+## 🖼️ Visualization
 
 Generate qualitative VIGOR matching and depth-lifted overlay figures:
 ```bash
