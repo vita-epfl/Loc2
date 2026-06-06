@@ -60,6 +60,15 @@ Checkpoints:
 
 Evaluation results are saved to `results/` by default. Use `--results_dir /path/to/output_dir` to override it.
 
+## Visualization
+
+Generate qualitative VIGOR matching and depth-lifted overlay figures:
+```bash
+python visualize_vigor.py --area samearea --random_orientation 180 --model_path <checkpoint> --index 0 1 2
+```
+
+Figures are saved to `figures/` by default. Use `--output_dir /path/to/figures` to override it.
+
 ## 🚀 Training
 
 ### VIGOR

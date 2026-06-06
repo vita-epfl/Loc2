@@ -130,7 +130,7 @@ class VIGORDataset(Dataset):
                 raise ValueError('Ground image is None')
             grd = self.grdimage_transform(grd)
 
-            depth_path = os.path.splitext(self.grd_list[idx].replace('panorama', 'unik3d_depth'))[0] + '.png'
+            depth_path = self._resolve_depth_path(self.grd_list[idx])
             depth = self._load_metric_depth(depth_path)
             if depth is None:
                 raise ValueError('Depth image is None')
@@ -169,6 +169,13 @@ class VIGORDataset(Dataset):
         except Exception as e:
             print(f'Unreadable image: {path} ({e})')
             return None
+
+    def _resolve_depth_path(self, ground_path):
+        depth_stem = os.path.splitext(ground_path.replace('panorama', 'unik3d_depth'))[0]
+        png_path = depth_stem + '.png'
+        if os.path.exists(png_path):
+            return png_path
+        return depth_stem + '.npy'
 
     def _load_metric_depth(self, path, max_depth=MAX_DEPTH_METERS):
         try:
