@@ -111,7 +111,7 @@ Training checkpoints are saved to `../checkpoints/` and metrics are saved to `..
 - [x] Evaluation pipeline
 - [x] Pretrained checkpoints
 - [x] Training scripts
-- [ ] Visualization tools
+- [x] Visualization tools
 
 ## Citation
 ```bibtex
