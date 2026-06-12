@@ -25,6 +25,7 @@ from external.unik3d.unik3d.utils.visualization import save_file_ply
 
 def save(rgb, outputs, name, base_path, save_map=False, save_pointcloud=False):
     os.makedirs(base_path, exist_ok=True)
+    max_depth = 65.0
 
     points_torch = outputs["points"]  # [B, 3, H, W]
 
@@ -33,14 +34,16 @@ def save(rgb, outputs, name, base_path, save_map=False, save_pointcloud=False):
     depth_vigor = np.linalg.norm(depth_vigor, axis=0)
 
     if save_map:
-        max_depth = 65.0
         depth_map = (np.clip(depth_vigor, 0.0, max_depth) * 1000.0).astype(np.uint16)
         Image.fromarray(depth_map).save(os.path.join(base_path, f"{name}.png"))
         # np.save(os.path.join(base_path, f"{name}.npy"), depth_vigor)
 
     if save_pointcloud:
-        predictions_3d = points_torch.permute(0, 2, 3, 1).reshape(-1, 3).detach().cpu().numpy()
-        rgb_np = rgb.permute(1, 2, 0).reshape(-1, 3).detach().cpu().numpy()
+        valid_mask = depth_vigor < max_depth
+        points_torch = points_torch[:, :, valid_mask]
+        rgb = rgb[:, valid_mask]
+        predictions_3d = points_torch.permute(0, 2, 1).reshape(-1, 3).detach().cpu().numpy()
+        rgb_np = rgb.permute(1, 0).reshape(-1, 3).detach().cpu().numpy()
         save_file_ply(predictions_3d, rgb_np, os.path.join(base_path, f"{name}.ply"))
 
 
@@ -99,11 +102,15 @@ def infer(model, args):
 
             try:
                 rgb = np.array(Image.open(rgb_path))
+                rgb_torch = torch.from_numpy(rgb).permute(2, 0, 1)
             except Exception as e:
                 print(f"Error occurred while opening {rgb_path}: {e}")
                 continue
 
-            rgb_torch = torch.from_numpy(rgb).permute(2, 0, 1)
+            # Update camera parameters since the image resolution may differ across files
+            params[4] = rgb.shape[1]
+            params[5] = rgb.shape[0]
+            camera = eval(camera_name)(params=params)
 
             with torch.no_grad():
                 outputs = model.infer(rgb=rgb_torch, camera=camera, normalize=True, rays=None)
@@ -136,7 +143,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--camera-path",
         type=str,
-        default="./doc/equirectangular.json",
+        default="./docs/equirectangular.json",
         help="Path to camera parameters json file.",
     )
     parser.add_argument("--save", action="store_true", help="Save outputs as .npy.")
