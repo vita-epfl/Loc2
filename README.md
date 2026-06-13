@@ -30,6 +30,12 @@ python preprocess/infer_depth_vigor.py --input <VIGOR_PATH>/<CITY_NAME>/panorama
 ### KITTI
 Please download and organize the KITTI dataset according to the directory structure used in [HighlyAccurate](https://github.com/YujiaoShi/HighlyAccurate).
 
+To generate metric depth maps for the KITTI dataset (for both training and evaluation):
+```bash
+python preprocess/infer_depth_kitti.py --img-path <KITTI_PATH> --outdir <OUTPUT_DIR> --save-depth
+```
+> *Note: Please download the corresponding checkpoint from [here](https://huggingface.co/depth-anything/Depth-Anything-V2-Metric-VKITTI-Large/resolve/main/depth_anything_v2_metric_vkitti_vitl.pth?download=true) and place it under `external/depthanythingv2/metric_depth/checkpoints`.*
+
 ## 📊 Evaluation
 
 Run all commands from the repository root.

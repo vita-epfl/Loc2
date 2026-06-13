@@ -1,3 +1,6 @@
 [submodule "external/unik3d"]
 	path = external/unik3d
 	url = https://github.com/lpiccinelli-eth/UniK3D.git
+[submodule "external/depthanythingv2"]
+	path = external/depthanythingv2
+	url = https://github.com/DepthAnything/Depth-Anything-V2.git
