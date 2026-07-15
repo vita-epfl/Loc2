@@ -246,7 +246,7 @@ def evaluate_loader(
                 yaw_diff = np.abs(yaw_pred - yaw_gt)
                 yaw_errors.append(float(np.min([yaw_diff, 360 - yaw_diff])))
 
-                heading_vec = np.array([np.sin(np.deg2rad(yaw_gt)), np.cos(np.deg2rad(yaw_gt))])
+                heading_vec = np.array([np.cos(np.deg2rad(yaw_gt)), np.sin(np.deg2rad(yaw_gt))])
                 dx, dy = delta_pixels_np[b]
                 longitudinal_pix = dx * heading_vec[0] + dy * heading_vec[1]
                 lateral_pix = heading_vec[0] * dy - heading_vec[1] * dx
